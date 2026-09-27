@@ -146,7 +146,9 @@ class DOGEMiningSession:
             if phase == "target_reached":
                 state.update(target_reached=True, earned_doge=str(earned), target_reached_at=now())
                 atomic_json(state_path, state)
-                info.update(phase=phase, earned_doge=str(earned), updated_at=now())
+                info.update(phase=phase, earned_doge=str(earned), pool_balance=snap["balance"],
+                            pool_paid=snap["paid"], miner_running=False, updated_at=now())
+                atomic_json(directory / "status.json", info)
                 return self.output(info)
             stop_file, heartbeat = directory / "STOP", directory / "heartbeat"
             stop_file.unlink(missing_ok=True)

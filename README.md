@@ -69,7 +69,7 @@ The node only **reads** pool APIs. It never changes payout settings or signs/sen
 
 ## Verification
 
-`test_core.py` checks baseline accounting, shared-baseline reuse, payout transitions and completion latching. `test_guardian.py` uses a harmless temporary fake process to test stop/heartbeat/time-limit/lock/parent-death behavior; it does not mine.
+`test_core.py` checks baseline accounting, shared-baseline reuse, payout transitions and completion latching. `test_guardian.py` uses a harmless temporary fake process to test stop/heartbeat/time-limit/lock/parent-death behavior. `test_nodes.py` checks ComfyUI cancellation, target completion, wallet locks, baseline validation, API failures and workflow widget order with mocked GPU/pool/process calls. These tests do not mine and do not establish real H200 hashrate or earnings.
 
 ```bash
 python -m unittest discover -v
