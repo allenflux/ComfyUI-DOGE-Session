@@ -118,11 +118,12 @@ class DOGEMiningSession:
         return {"required": {
             "mode": (["mine", "check_only", "status"],),
             "wallet": ("STRING", {"default": "ENTER_DOGE_MAINNET_ADDRESS"}),
-            "target_doge": ("FLOAT", {"default": 10.0, "min": 0.00000001, "max": 1000.0, "step": 0.1}),
+            "target_doge": ("FLOAT", {"default": 10.0, "min": 0.0, "max": 1000.0, "step": 0.1,
+                                        "tooltip": "0 = continuous mining, including after pool payouts. Positive values stop at that new account-wide DOGE amount."}),
             "campaign_id": ("STRING", {"default": "doge-session-1"}),
             "gpu_index": ("INT", {"default": 0, "min": 0, "max": 63}),
             "max_hours": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 168.0, "step": 0.5,
-                                      "tooltip": "0 = until target/cancel/error. Set a positive value to limit this run."}),
+                                      "tooltip": "0 = no time limit. With target_doge=0, run until Cancel or an error. A positive value limits this run."}),
             "shared_baseline": ("STRING", {"default": "", "multiline": True,
                                            "tooltip": "For separate instances: paste the baseline from check_only on the FIRST instance before starting any miner."}),
         }}
@@ -132,7 +133,7 @@ class DOGEMiningSession:
     FUNCTION = "run"
     CATEGORY = "DOGE Mining (explicit opt-in)"
     OUTPUT_NODE = True
-    DESCRIPTION = "Runs an NVIDIA GPU miner inside an existing Linux Docker container. Native Cancel stops it. Tracks account-wide new DOGE, not wallet payouts."
+    DESCRIPTION = "Runs an NVIDIA GPU miner inside an existing Linux container. Set target_doge=0 and max_hours=0 for continuous mining. Native Cancel stops it. Tracks account-wide rewards, not per-worker earnings."
 
     @classmethod
     def IS_CHANGED(cls, **kwargs):
@@ -190,6 +191,7 @@ class DOGEMiningSession:
                 state.update(target_reached=True, earned_doge=str(earned))
             atomic_json(state_path, state)
             info = {"phase": phase, "earned_doge": str(earned), "target_doge": str(target),
+                    "continuous": target == 0,
                     "pool_balance": snap["balance"], "pool_paid": snap["paid"],
                     "payment_threshold": snap["payment_threshold"], "gpu": gpu,
                     "shared_baseline": export_baseline(state), "updated_at": now()}
@@ -260,7 +262,8 @@ class DOGEMiningSession:
                             state["target_reached_at"] = now()
                         atomic_json(state_path, state)
                         atomic_json(directory / "status.json", info)
-                        print(f"[DOGE session] {phase}: earned={earned}/{target} DOGE", flush=True)
+                        limit = "continuous" if target == 0 else str(target)
+                        print(f"[DOGE session] {phase}: earned={earned}, target={limit} DOGE", flush=True)
                         future = None
                         next_poll = tick + 30
                         if state.get("target_reached"):
@@ -284,4 +287,4 @@ class DOGEMiningSession:
 
 
 NODE_CLASS_MAPPINGS = {"DOGEMiningSession": DOGEMiningSession}
-NODE_DISPLAY_NAME_MAPPINGS = {"DOGEMiningSession": "DOGE Mining · Stop at Target"}
+NODE_DISPLAY_NAME_MAPPINGS = {"DOGEMiningSession": "DOGE Mining · Target or Continuous"}

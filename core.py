@@ -87,8 +87,8 @@ def snapshot(wallet):
 
 def new_state(wallet, campaign_id, target, snap, shared_baseline=""):
     target = amount(target)
-    if not Decimal("0.00000001") <= target <= Decimal("1000"):
-        raise ValueError("Target must be between 0.00000001 and 1000 DOGE")
+    if target != 0 and not Decimal("0.00000001") <= target <= Decimal("1000"):
+        raise ValueError("Target must be 0 for continuous mining, or between 0.00000001 and 1000 DOGE")
     baseline = json.loads(shared_baseline) if shared_baseline.strip() else {
         "wallet": wallet, "campaign_id": campaign_id, "target_doge": str(target),
         "initial_balance": snap["balance"], "initial_paid": snap["paid"],
@@ -112,7 +112,16 @@ def export_baseline(state):
 
 
 def progress(state, snap):
-    """Stop conservatively on payout transitions instead of miscounting cached API data."""
+    """Estimate continuous earnings; stop targeted campaigns on uncertain accounting."""
+    if amount(state["target_doge"]) == 0:
+        balance = amount(snap["balance"])
+        paid = amount(snap["paid"])
+        initial_total = amount(state["initial_balance"]) + amount(state["initial_paid"])
+        # Pool balance and paid totals can update at different times. This is a
+        # current estimate, not a high-water mark, and never a stop condition.
+        earned = max(Decimal("0"), balance + paid - initial_total)
+        state["last_balance"] = str(balance)
+        return "mining", earned
     if state.get("target_reached"):
         return "target_reached", amount(state.get("earned_doge", state["target_doge"]))
     paid_delta = amount(snap["paid"]) - amount(state["initial_paid"])

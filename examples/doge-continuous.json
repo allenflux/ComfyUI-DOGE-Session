@@ -1,0 +1,58 @@
+{
+  "id": "c99d0f52-e1b1-4f73-a969-d430758ca7e6",
+  "revision": 0,
+  "last_node_id": 1,
+  "last_link_id": 0,
+  "nodes": [
+    {
+      "id": 1,
+      "type": "DOGEMiningSession",
+      "pos": [
+        100,
+        120
+      ],
+      "size": [
+        780,
+        540
+      ],
+      "flags": {},
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "session_status",
+          "type": "STRING",
+          "links": null,
+          "slot_index": 0
+        }
+      ],
+      "title": "DOGE: CONTINUOUS | Cancel stops miner",
+      "properties": {
+        "Node name for S&R": "DOGEMiningSession"
+      },
+      "widgets_values": [
+        "mine",
+        "ENTER_DOGE_MAINNET_ADDRESS",
+        0.0,
+        "doge-continuous-1",
+        0,
+        0.0,
+        ""
+      ]
+    }
+  ],
+  "links": [],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 1,
+      "offset": [
+        0,
+        0
+      ]
+    }
+  },
+  "version": 0.4
+}

@@ -149,6 +149,31 @@ class NodeIntegrationTests(unittest.TestCase):
         self.launch.assert_called_once()
         self.install.assert_called_once()
 
+    def test_continuous_survives_payout_and_native_cancel_still_stops_it(self):
+        def pool_snapshot(wallet):
+            if self.pool.call_count < 3:
+                return dict(self.snap)
+            self.interrupted = True  # Cancel on the next loop, after payout accounting.
+            return {**self.snap, "balance": "0.5", "paid": "30"}
+
+        self.pool.side_effect = pool_snapshot
+        with self.assertRaises(Interrupted):
+            self.run_node(target_doge=0.0, max_hours=0.0)
+        self.launch.assert_called_once()
+        self.assert_guardian_stopped()
+        self.assertEqual(self.read("status.json")["phase"], "cancelled")
+        self.assertTrue(self.read("status.json")["continuous"])
+        self.assertEqual(self.read("campaign.json")["earned_doge"], "28.0")
+        self.assertFalse(self.read("campaign.json")["target_reached"])
+        self.assertEqual(self.read("guardian-config.json")["max_hours"], 0.0)
+
+    def test_continuous_does_not_suppress_pool_failures(self):
+        self.pool.side_effect = [dict(self.snap), dict(self.snap), TimeoutError("mock pool failure")]
+        with self.assertRaisesRegex(TimeoutError, "mock pool failure"):
+            self.run_node(target_doge=0.0, max_hours=0.0)
+        self.assert_guardian_stopped()
+        self.assertEqual(self.read("status.json")["phase"], "error")
+
     def test_same_wallet_active_campaign_blocks_before_pool_or_launch(self):
         locks = self.root / "doge-mining" / "locks"
         locks.mkdir(parents=True)
