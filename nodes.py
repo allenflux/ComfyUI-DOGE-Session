@@ -15,13 +15,74 @@ import time
 from .core import amount, atomic_json, export_baseline, install_miner, new_state, now, progress, snapshot, validate_state, validate_wallet
 
 
+def _container_evidence(cgroup, mountinfo, kubernetes_service_host):
+    """Recognize kernel-reported container paths, including namespaced cgroup v2."""
+    container_cgroup = re.compile(
+        r"(?:^|/)(?:kubepods(?:[./-]|$)|"
+        r"(?:docker|containerd)/[0-9a-f]{12,64}(?:/|$)|"
+        r"(?:docker|cri-containerd)-[0-9a-f]{12,64}\.scope(?:/|$))"
+    )
+    for line in cgroup.splitlines():
+        fields = line.split(":", 2)
+        if len(fields) == 3 and container_cgroup.search(fields[2]):
+            return True
+
+    # A private cgroup namespace commonly exposes only "0::/". Kubernetes
+    # requires independent mount evidence; its environment variable alone is
+    # not sufficient to identify a container.
+    if not kubernetes_service_host:
+        return False
+    pod_mount_root = re.compile(
+        r"(?:^|/)(?:kubepods(?:[./-]|$)|"
+        r"kubelet/pods/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}(?:/|$))"
+    )
+    service_account_mounts = {
+        "/var/run/secrets/kubernetes.io/serviceaccount",
+        "/run/secrets/kubernetes.io/serviceaccount",
+    }
+    for line in mountinfo.splitlines():
+        fields = line.split()
+        try:
+            separator = fields.index("-")
+        except ValueError:
+            continue
+        if separator < 6 or len(fields) < separator + 4:
+            continue
+        # Only inspect the kernel's root and mountpoint fields. Do not match
+        # incidental text in mount options, and never read serviceaccount data.
+        root, mountpoint = (
+            re.sub(r"\\([0-7]{3})", lambda match: chr(int(match.group(1), 8)), value)
+            for value in fields[3:5]
+        )
+        if (pod_mount_root.search(root) or pod_mount_root.search(mountpoint)
+                or mountpoint in service_account_mounts):
+            return True
+    return False
+
+
+def container_environment():
+    """Read container evidence without modifying markers or accessing tokens."""
+    if any(Path(path).exists() for path in ("/.dockerenv", "/run/.containerenv")):
+        return True
+
+    def read_evidence(path):
+        try:
+            return Path(path).read_text(errors="ignore")
+        except OSError:
+            return ""
+
+    return _container_evidence(
+        read_evidence("/proc/1/cgroup"),
+        read_evidence("/proc/self/mountinfo"),
+        os.environ.get("KUBERNETES_SERVICE_HOST"),
+    )
+
+
 def environment(gpu_index):
     if platform.system() != "Linux" or platform.machine() not in ("x86_64", "amd64"):
         raise RuntimeError("This node requires a Linux x86_64 NVIDIA GPU container; it does not run on macOS")
-    markers = (Path("/.dockerenv"), Path("/run/.containerenv"))
-    cgroup = Path("/proc/1/cgroup").read_text(errors="ignore")
-    if not any(path.exists() for path in markers) and not any(x in cgroup for x in ("docker", "containerd", "kubepods")):
-        raise RuntimeError("Container environment was not detected. Run ComfyUI inside the authorized GPU Docker container")
+    if not container_environment():
+        raise RuntimeError("Container environment was not detected. Run ComfyUI inside the authorized GPU container")
     result = subprocess.run(["nvidia-smi", "--query-gpu=index,uuid,name", "--format=csv,noheader"],
                             text=True, capture_output=True, timeout=10, check=True)
     for line in result.stdout.splitlines():

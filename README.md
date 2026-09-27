@@ -28,6 +28,8 @@ git clone https://github.com/allenflux/ComfyUI-DOGE-Session.git
 - Outbound HTTPS to official GitHub releases and `api.unmineable.com`; outbound TLS mining connection to `octopus.unmineable.com:4444`.
 - Persistent ComfyUI `user/` storage. Plan for under 100 MB for the cached executable/state and up to about 2 MB of rotated miner logs per campaign. GPU VRAM and electricity are still consumed; this does not guarantee profit.
 
+Kubernetes/containerd Pods are supported, including private cgroup v2 namespaces. Container detection uses kernel mount evidence together with the Kubernetes environment; it never reads service-account tokens. A persistent `models/` volume alone does not preserve this node or its earning baseline. Keep the node checkout and `user/doge-mining/` on storage dedicated to this ComfyUI instance, and restore the custom-node/state links after Pod replacement. No nested Docker daemon is required. Check for other Pods sharing the same physical GPU before starting a miner.
+
 ## Run and stop
 
 1. Fill `wallet` with a Dogecoin mainnet address beginning with `D`. Never enter a private key, seed phrase or exchange API key.
@@ -69,7 +71,7 @@ The node only **reads** pool APIs. It never changes payout settings or signs/sen
 
 ## Verification
 
-`test_core.py` checks baseline accounting, shared-baseline reuse, payout transitions and completion latching. `test_guardian.py` uses a harmless temporary fake process to test stop/heartbeat/time-limit/lock/parent-death behavior. `test_nodes.py` checks ComfyUI cancellation, target completion, wallet locks, baseline validation, API failures and workflow widget order with mocked GPU/pool/process calls. These tests do not mine and do not establish real H200 hashrate or earnings.
+`test_core.py` checks baseline accounting, shared-baseline reuse, payout transitions and completion latching. `test_guardian.py` uses a harmless temporary fake process to test stop/heartbeat/time-limit/lock/parent-death behavior. `test_nodes.py` checks ComfyUI cancellation, target completion, wallet locks, baseline validation, API failures and workflow widget order with mocked GPU/pool/process calls. `test_environment.py` verifies container detection for Docker/Kubernetes and rejects host-only evidence. These tests do not mine and do not establish real H200 hashrate or earnings.
 
 ```bash
 python -m unittest discover -v
